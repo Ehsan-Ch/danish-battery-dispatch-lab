@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {scaleTotals,intervalCash,cumulative,csv} from '../core.mjs';
+const report=JSON.parse(fs.readFileSync(new URL('../reports/results.json',import.meta.url)));
+test('scale changes money and energy, not equivalent cycles',()=>{assert.deepEqual(scaleTotals({net:10,cycles:2,import_mwh:4},2),{net:20,cycles:2,import_mwh:8});});
+test('reject invalid scale',()=>{for(const x of [0,-1,NaN,Infinity])assert.throws(()=>scaleTotals({},x));});
+test('CSV quotes separators and embedded quotes',()=>{assert.equal(csv([{label:'a,"b"',value:2}]),'"label","value"\r\n"a,""b""","2"');assert.equal(csv([]),'');});
+test('cumulative values retain negative periods',()=>{assert.deepEqual(cumulative([10,-15,20]),[10,-5,15]);});
+test('every browser day reconciles with full precision totals',()=>{for(const d of report.days)for(const p of Object.keys(d.policies)){const rows=intervalCash(d,p);const net=rows.reduce((s,r)=>s+r.net,0);assert.ok(Math.abs(net-d.policies[p].totals.net)<.002);assert.equal(rows.length,96);}});
+test('download scaling and idle',()=>{const d=report.days[0],a=intervalCash(d,'selected'),b=intervalCash(d,'selected',2);for(let i=0;i<a.length;i++)assert.equal(b[i].net,2*a[i].net);assert.ok(intervalCash(d,'idle').every(r=>r.net===0&&r.soc===1));});
